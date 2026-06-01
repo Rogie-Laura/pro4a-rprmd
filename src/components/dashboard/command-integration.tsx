@@ -63,6 +63,7 @@ export function CommandIntegration({ apiKeys, baseUrl, hasServiceRole }: Command
 
   const personnelUrl = `${baseUrl}/api/command/personnel`;
   const statsUrl = `${baseUrl}/api/command/stats`;
+  const metaUrl = `${baseUrl}/api/command/meta`;
 
   function handleGenerate() {
     const formData = new FormData();
@@ -125,8 +126,14 @@ export function CommandIntegration({ apiKeys, baseUrl, hasServiceRole }: Command
         <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--app-text-muted)]">
           Endpoints
         </p>
-        <EndpointRow method="GET" url={personnelUrl} />
+        <EndpointRow method="GET" url={metaUrl} />
         <EndpointRow method="GET" url={statsUrl} />
+        <EndpointRow method="GET" url={personnelUrl} />
+        <p className="text-[10px] text-[var(--app-text-muted)]">
+          Poll <code className="font-mono">/meta</code> for{' '}
+          <code className="font-mono">last_updated</code>; only pull{' '}
+          <code className="font-mono">/personnel</code> when it changes.
+        </p>
       </div>
 
       <div className="mt-5 border-t border-[var(--app-border)] pt-4">
