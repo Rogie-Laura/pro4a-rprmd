@@ -1,4 +1,5 @@
 import { unstable_cache } from 'next/cache';
+import type { PersonnelScope } from '@/lib/auth/roles';
 import { createAdminClient, hasAdminClient } from '@/lib/supabase/admin';
 import type { PersonnelRecord } from '@/lib/personnel/types';
 
@@ -13,6 +14,7 @@ export type PersonnelPageParams = {
   sort: PersonnelSort;
   limit: number;
   offset: number;
+  scope: PersonnelScope | null;
 };
 
 export type PersonnelPage = {
@@ -33,6 +35,8 @@ async function fetchPersonnelPageFromDb(params: PersonnelPageParams): Promise<Pe
     p_sort: params.sort,
     p_limit: params.limit,
     p_offset: params.offset,
+    p_office: params.scope?.office || null,
+    p_station: params.scope?.station || null,
   });
 
   if (error || !data) {

@@ -50,6 +50,35 @@ export function canAccessSystemSettings(role: string | null | undefined): boolea
   return role === 'super_admin';
 }
 
+/** Roles that only see personnel matching their own office + unit. */
+export function isScopedPersonnelRole(role: string | null | undefined): boolean {
+  return role === 'rhq_admin' || role === 'phq_admin' || role === 'stn_admin';
+}
+
+export type PersonnelScope = {
+  office: string;
+  station: string;
+};
+
+/**
+ * Returns office/station filters for personnel_list queries.
+ * null = no restriction (super_admin, RPRMD_admin).
+ */
+export function getPersonnelScopeForUser(user: {
+  role: AppRole;
+  office: string | null;
+  unit: string | null;
+} | null): PersonnelScope | null {
+  if (!user || !isScopedPersonnelRole(user.role)) {
+    return null;
+  }
+
+  const office = user.office?.trim() ?? '';
+  const station = user.unit?.trim() ?? '';
+
+  return { office, station };
+}
+
 export function canManageTargetRole(
   actorRole: string | null | undefined,
   targetRole: AppRole

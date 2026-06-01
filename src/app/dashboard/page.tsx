@@ -1,5 +1,5 @@
 import { PersonnelTable } from '@/components/dashboard/personnel-table';
-import { canAddPersonnel } from '@/lib/auth/roles';
+import { canAddPersonnel, getPersonnelScopeForUser } from '@/lib/auth/roles';
 import { getSessionUser } from '@/lib/auth/session';
 import {
   getPersonnelPage,
@@ -43,10 +43,17 @@ export default async function DashboardPage({
 
   const offset = (page - 1) * limit;
 
-  const [session, data] = await Promise.all([
-    getSessionUser(),
-    getPersonnelPage({ search, view, sort, limit, offset }),
-  ]);
+  const session = await getSessionUser();
+  const scope = getPersonnelScopeForUser(session.user);
+
+  const data = await getPersonnelPage({ search, view, sort, limit, offset, scope });
+
+  const scopeLabel =
+    scope && scope.office && scope.station
+      ? `${scope.office} — ${scope.station}`
+      : scope
+        ? 'Your account has no office/unit assigned — contact an administrator.'
+        : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -59,6 +66,7 @@ export default async function DashboardPage({
         limit={limit}
         page={page}
         canAddPersonnel={canAddPersonnel(session.user?.role)}
+        scopeLabel={scopeLabel}
       />
     </div>
   );

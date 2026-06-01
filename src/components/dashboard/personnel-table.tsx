@@ -17,6 +17,7 @@ type PersonnelTableProps = {
   limit: number;
   page: number;
   canAddPersonnel?: boolean;
+  scopeLabel?: string | null;
 };
 
 const SORT_OPTIONS: { value: PersonnelSort; label: string }[] = [
@@ -141,6 +142,7 @@ export function PersonnelTable({
   limit,
   page,
   canAddPersonnel = false,
+  scopeLabel = null,
 }: PersonnelTableProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -211,6 +213,12 @@ export function PersonnelTable({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      {scopeLabel ? (
+        <div className="mb-2 shrink-0 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-800 dark:text-amber-200">
+          Showing personnel for: <span className="font-semibold">{scopeLabel}</span>
+        </div>
+      ) : null}
+
       <div className="mb-3 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2">
         <ToolbarField label="Search:">
           <input
