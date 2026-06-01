@@ -1,10 +1,21 @@
+import { headers } from 'next/headers';
 import Link from 'next/link';
+import { listApiKeys } from '@/app/actions/api-keys';
+import { CommandIntegration } from '@/components/dashboard/command-integration';
 import { PersonnelUpload } from '@/components/dashboard/personnel-upload';
 import { requireSystemSettingsAccess } from '@/lib/auth/session';
 import { hasAdminClient } from '@/lib/supabase/admin';
 
 export default async function SystemSettingsPage() {
   await requireSystemSettingsAccess();
+
+  const serviceRoleReady = hasAdminClient();
+  const apiKeys = serviceRoleReady ? await listApiKeys() : [];
+
+  const headerList = await headers();
+  const host = headerList.get('host') ?? 'pro4a-rprmd.vercel.app';
+  const protocol = host.startsWith('localhost') || host.startsWith('127.') ? 'http' : 'https';
+  const baseUrl = `${protocol}://${host}`;
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto">
@@ -33,7 +44,13 @@ export default async function SystemSettingsPage() {
           </div>
         </div>
 
-        <PersonnelUpload hasServiceRole={hasAdminClient()} />
+        <CommandIntegration
+          apiKeys={apiKeys}
+          baseUrl={baseUrl}
+          hasServiceRole={serviceRoleReady}
+        />
+
+        <PersonnelUpload hasServiceRole={serviceRoleReady} />
       </div>
     </div>
   );
