@@ -269,13 +269,13 @@ export function PersonnelTable({
 
         <div className="flex items-center gap-1.5">
           <PageNavButton
-            symbol="<"
+            symbol="<<"
             ariaLabel="First page"
             onClick={() => goToPage(1)}
             disabled={currentPage <= 1}
           />
           <PageNavButton
-            symbol="<<"
+            symbol="<"
             ariaLabel="Previous page"
             onClick={() => goToPage(currentPage - 1)}
             disabled={currentPage <= 1}
@@ -284,13 +284,13 @@ export function PersonnelTable({
             {currentPage} out of {totalPages}
           </span>
           <PageNavButton
-            symbol=">>"
+            symbol=">"
             ariaLabel="Next page"
             onClick={() => goToPage(currentPage + 1)}
             disabled={currentPage >= totalPages}
           />
           <PageNavButton
-            symbol=">"
+            symbol=">>"
             ariaLabel="Last page"
             onClick={() => goToPage(totalPages)}
             disabled={currentPage >= totalPages}

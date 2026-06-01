@@ -60,16 +60,17 @@ export async function uploadPersonnelList(formData: FormData): Promise<Personnel
 
     const admin = createAdminClient();
 
-    if (replaceExisting) {
-      const { error: deleteError } = await admin.from(DATA_TABLE).delete().gte('id', 0);
+    // Watermark: rows inserted by this run get higher ids than this. We insert
+    // first and only remove the old rows after every batch succeeds, so a
+    // mid-import failure never leaves the table empty or partially replaced.
+    const { data: maxRow } = await admin
+      .from(DATA_TABLE)
+      .select('id')
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-      if (deleteError) {
-        return {
-          ok: false,
-          message: `Failed to clear existing records: ${deleteError.message}`,
-        };
-      }
-    }
+    const watermarkId = (maxRow?.id as number | undefined) ?? 0;
 
     let imported = 0;
 
@@ -78,14 +79,33 @@ export async function uploadPersonnelList(formData: FormData): Promise<Personnel
       const { error } = await admin.from(DATA_TABLE).insert(batch);
 
       if (error) {
+        // Roll back only the rows this run inserted; existing data is untouched.
+        if (imported > 0) {
+          await admin.from(DATA_TABLE).delete().gt('id', watermarkId);
+        }
+
         return {
           ok: false,
-          message: `Import stopped at row ${index + 1}: ${error.message}. ${imported} row(s) were saved before the error.`,
-          imported,
+          message: `Import failed at row ${index + 1}: ${error.message}. No changes were saved.`,
         };
       }
 
       imported += batch.length;
+    }
+
+    if (replaceExisting) {
+      const { error: deleteError } = await admin
+        .from(DATA_TABLE)
+        .delete()
+        .lte('id', watermarkId);
+
+      if (deleteError) {
+        return {
+          ok: false,
+          message: `Imported ${imported} record(s), but failed to remove the previous list: ${deleteError.message}`,
+          imported,
+        };
+      }
     }
 
     revalidateTag(PERSONNEL_LIST_CACHE_TAG, 'max');

@@ -17,18 +17,6 @@ export type AppUser = {
   is_active: boolean;
 };
 
-type SessionRpcUser = {
-  id: string;
-  rank: string | null;
-  full_name: string;
-  rank_fullname: string | null;
-  badge_number: string;
-  office: string | null;
-  unit: string | null;
-  role: AppRole;
-  is_active: boolean;
-};
-
 const fetchUserBySession = cache(async (sessionToken: string): Promise<AppUser | null> => {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc('get_user_by_session', {
@@ -39,7 +27,7 @@ const fetchUserBySession = cache(async (sessionToken: string): Promise<AppUser |
     return null;
   }
 
-  return data as SessionRpcUser;
+  return data as AppUser;
 });
 
 export const getSessionUser = cache(async (): Promise<{

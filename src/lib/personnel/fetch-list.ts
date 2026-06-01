@@ -1,5 +1,5 @@
 import { unstable_cache } from 'next/cache';
-import { createClient } from '@supabase/supabase-js';
+import { createAdminClient, hasAdminClient } from '@/lib/supabase/admin';
 import type { PersonnelRecord } from '@/lib/personnel/types';
 
 export const PERSONNEL_LIST_CACHE_TAG = 'personnel-list';
@@ -20,15 +20,13 @@ export type PersonnelPage = {
   total: number;
 };
 
-function createAnonClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
-
 async function fetchPersonnelPageFromDb(params: PersonnelPageParams): Promise<PersonnelPage> {
-  const supabase = createAnonClient();
+  // Data RPCs are server-only (revoked from anon); use the service-role client.
+  if (!hasAdminClient()) {
+    return { records: [], total: 0 };
+  }
+
+  const supabase = createAdminClient();
   const { data, error } = await supabase.rpc('list_personnel_rprmd_paged', {
     p_search: params.search,
     p_view: params.view,
