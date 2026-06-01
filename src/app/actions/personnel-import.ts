@@ -111,6 +111,7 @@ export async function uploadPersonnelList(formData: FormData): Promise<Personnel
     revalidateTag(PERSONNEL_LIST_CACHE_TAG, 'max');
     revalidatePath('/dashboard');
     revalidatePath('/dashboard/settings');
+    revalidatePath('/dashboard/users');
 
     const warning =
       errors.length > 0 ? ` ${errors.length} row(s) were skipped due to validation errors.` : '';

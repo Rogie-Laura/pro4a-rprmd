@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   createManagedUser,
@@ -12,12 +12,18 @@ import {
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Modal } from '@/components/ui/modal';
 import { ROLE_LABELS, canManageTargetRole, type AppRole } from '@/lib/auth/roles';
+import {
+  unitsForOffice,
+  withCurrentOption,
+  type PersonnelLookupOptions,
+} from '@/lib/personnel/lookup-options';
 
 type UserManagementProps = {
   users: ManagedUser[];
   assignableRoles: AppRole[];
   actorRole: AppRole;
   currentUserId: string;
+  lookup: PersonnelLookupOptions;
 };
 
 const TABLE_COLUMN_WIDTHS = {
@@ -77,7 +83,94 @@ function StatusBadge({ active }: { active: boolean }) {
   );
 }
 
-export function UserManagement({ users, assignableRoles, actorRole, currentUserId }: UserManagementProps) {
+function RankOfficeUnitFields({
+  idPrefix,
+  lookup,
+  rank,
+  office,
+  unit,
+  onRankChange,
+  onOfficeChange,
+  onUnitChange,
+}: {
+  idPrefix: string;
+  lookup: PersonnelLookupOptions;
+  rank: string;
+  office: string;
+  unit: string;
+  onRankChange: (value: string) => void;
+  onOfficeChange: (value: string) => void;
+  onUnitChange: (value: string) => void;
+}) {
+  const rankOptions = useMemo(
+    () => withCurrentOption(lookup.ranks, rank),
+    [lookup.ranks, rank]
+  );
+  const officeOptions = useMemo(
+    () => withCurrentOption(lookup.offices, office),
+    [lookup.offices, office]
+  );
+  const unitOptions = useMemo(
+    () => unitsForOffice(lookup, office, unit),
+    [lookup, office, unit]
+  );
+
+  return (
+    <>
+      <div>
+        <label htmlFor={`${idPrefix}-rank`} className={labelClass}>Rank</label>
+        <select
+          id={`${idPrefix}-rank`}
+          name="rank"
+          required
+          value={rank}
+          onChange={(event) => onRankChange(event.target.value)}
+          className={inputClass}
+        >
+          <option value="">Select rank...</option>
+          {rankOptions.map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label htmlFor={`${idPrefix}-office`} className={labelClass}>Office</label>
+        <select
+          id={`${idPrefix}-office`}
+          name="office"
+          required
+          value={office}
+          onChange={(event) => onOfficeChange(event.target.value)}
+          className={inputClass}
+        >
+          <option value="">Select office...</option>
+          {officeOptions.map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label htmlFor={`${idPrefix}-unit`} className={labelClass}>Unit</label>
+        <select
+          id={`${idPrefix}-unit`}
+          name="unit"
+          required
+          value={unit}
+          disabled={!office}
+          onChange={(event) => onUnitChange(event.target.value)}
+          className={`${inputClass} disabled:opacity-50`}
+        >
+          <option value="">{office ? 'Select unit...' : 'Select office first'}</option>
+          {unitOptions.map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+      </div>
+    </>
+  );
+}
+
+export function UserManagement({ users, assignableRoles, actorRole, currentUserId, lookup }: UserManagementProps) {
   const router = useRouter();
   const createFormRef = useRef<HTMLFormElement>(null);
   const [search, setSearch] = useState('');
@@ -94,6 +187,33 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
   const [actionResult, setActionResult] = useState<UserActionResult | null>(null);
   const [isCreating, startCreate] = useTransition();
   const [isUpdating, startUpdate] = useTransition();
+
+  const [addRank, setAddRank] = useState('');
+  const [addOffice, setAddOffice] = useState('');
+  const [addUnit, setAddUnit] = useState('');
+  const [editRank, setEditRank] = useState('');
+  const [editOffice, setEditOffice] = useState('');
+  const [editUnit, setEditUnit] = useState('');
+
+  useEffect(() => {
+    if (!editUser) {
+      return;
+    }
+
+    setEditRank(editUser.rank ?? '');
+    setEditOffice(editUser.office ?? '');
+    setEditUnit(editUser.unit ?? '');
+  }, [editUser]);
+
+  function handleAddOfficeChange(value: string) {
+    setAddOffice(value);
+    setAddUnit('');
+  }
+
+  function handleEditOfficeChange(value: string) {
+    setEditOffice(value);
+    setEditUnit('');
+  }
 
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -128,7 +248,18 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
     setShowCreateConfirm(false);
     setCreateConfirmSummary(null);
     setCreateResult(null);
+    setAddRank('');
+    setAddOffice('');
+    setAddUnit('');
     createFormRef.current?.reset();
+  }
+
+  function openAddModal() {
+    setCreateResult(null);
+    setAddRank('');
+    setAddOffice('');
+    setAddUnit('');
+    setShowAddModal(true);
   }
 
   function requestCreateConfirm() {
@@ -221,10 +352,7 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
 
         <button
           type="button"
-          onClick={() => {
-            setCreateResult(null);
-            setShowAddModal(true);
-          }}
+          onClick={openAddModal}
           className="ml-auto inline-flex h-8 shrink-0 items-center rounded-md bg-amber-500 px-3 text-xs font-semibold text-slate-950 transition hover:bg-amber-400"
         >
           Add User
@@ -350,10 +478,16 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
           }
         >
           <form ref={createFormRef} id="create-user-form" className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label htmlFor="rank" className={labelClass}>Rank</label>
-              <input id="rank" name="rank" className={inputClass} placeholder="PSSg" />
-            </div>
+            <RankOfficeUnitFields
+              idPrefix="add"
+              lookup={lookup}
+              rank={addRank}
+              office={addOffice}
+              unit={addUnit}
+              onRankChange={setAddRank}
+              onOfficeChange={handleAddOfficeChange}
+              onUnitChange={setAddUnit}
+            />
             <div>
               <label htmlFor="full_name" className={labelClass}>Full Name</label>
               <input id="full_name" name="full_name" required className={inputClass} placeholder="Juan Dela Cruz" />
@@ -363,18 +497,10 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
               <input id="badge_number" name="badge_number" required className={inputClass} placeholder="226609" />
             </div>
             <div>
-              <label htmlFor="office" className={labelClass}>Office</label>
-              <input id="office" name="office" className={inputClass} placeholder="PRO4A" />
-            </div>
-            <div>
-              <label htmlFor="unit" className={labelClass}>Unit</label>
-              <input id="unit" name="unit" className={inputClass} placeholder="RPRMD" />
-            </div>
-            <div>
               <label htmlFor="password" className={labelClass}>Password</label>
               <input id="password" name="password" type="password" required minLength={6} className={inputClass} placeholder="Min. 6 characters" />
             </div>
-            <div className="sm:col-span-2">
+            <div>
               <label htmlFor="role" className={labelClass}>Role</label>
               <select id="role" name="role" required defaultValue={assignableRoles[assignableRoles.length - 1]} className={inputClass}>
                 {assignableRoles.map((role) => (
@@ -383,6 +509,12 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
               </select>
             </div>
           </form>
+          {lookup.offices.length === 0 ? (
+            <p className="mt-3 text-xs text-amber-600 dark:text-amber-200">
+              Office and unit lists are empty. Import personnel data first, or run{' '}
+              <code className="font-mono">sql/015_personnel_lookup_options.sql</code> in Supabase.
+            </p>
+          ) : null}
           {createResult && !createResult.ok ? (
             <div className="mt-3">
               <ActionMessage result={createResult} />
@@ -413,21 +545,19 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
                   {editUser.badge_number}
                 </p>
               </div>
-              <div>
-                <label htmlFor="edit-rank" className={labelClass}>Rank</label>
-                <input id="edit-rank" name="rank" defaultValue={editUser.rank ?? ''} className={inputClass} />
-              </div>
+              <RankOfficeUnitFields
+                idPrefix="edit"
+                lookup={lookup}
+                rank={editRank}
+                office={editOffice}
+                unit={editUnit}
+                onRankChange={setEditRank}
+                onOfficeChange={handleEditOfficeChange}
+                onUnitChange={setEditUnit}
+              />
               <div className="sm:col-span-2">
                 <label htmlFor="edit-full_name" className={labelClass}>Full Name</label>
                 <input id="edit-full_name" name="full_name" defaultValue={editUser.full_name} required className={inputClass} />
-              </div>
-              <div>
-                <label htmlFor="edit-office" className={labelClass}>Office</label>
-                <input id="edit-office" name="office" defaultValue={editUser.office ?? ''} className={inputClass} />
-              </div>
-              <div>
-                <label htmlFor="edit-unit" className={labelClass}>Unit</label>
-                <input id="edit-unit" name="unit" defaultValue={editUser.unit ?? ''} className={inputClass} />
               </div>
               <div>
                 <label htmlFor="edit-role" className={labelClass}>Role</label>

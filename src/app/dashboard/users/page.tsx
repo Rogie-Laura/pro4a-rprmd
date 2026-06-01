@@ -1,12 +1,14 @@
 import { UserManagement } from '@/components/user-management';
 import { getAssignableRolesForActor, listManagedUsers } from '@/app/actions/users';
 import { requireUserManagementAccess } from '@/lib/auth/session';
+import { getPersonnelLookupOptions } from '@/lib/personnel/lookup-options';
 
 export default async function UsersPage() {
   const session = await requireUserManagementAccess();
-  const [users, assignableRoles] = await Promise.all([
+  const [users, assignableRoles, lookup] = await Promise.all([
     listManagedUsers(),
     getAssignableRolesForActor(),
+    getPersonnelLookupOptions(),
   ]);
 
   return (
@@ -23,6 +25,7 @@ export default async function UsersPage() {
         assignableRoles={assignableRoles}
         actorRole={session.user!.role}
         currentUserId={session.userId}
+        lookup={lookup}
       />
     </div>
   );
