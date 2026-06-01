@@ -18,6 +18,7 @@ type PersonnelTableProps = {
   page: number;
   canAddPersonnel?: boolean;
   scopeLabel?: string | null;
+  fetchError?: string;
 };
 
 const SORT_OPTIONS: { value: PersonnelSort; label: string }[] = [
@@ -143,6 +144,7 @@ export function PersonnelTable({
   page,
   canAddPersonnel = false,
   scopeLabel = null,
+  fetchError,
 }: PersonnelTableProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -213,6 +215,12 @@ export function PersonnelTable({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      {fetchError ? (
+        <div className="mb-2 shrink-0 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs text-red-700 dark:text-red-300">
+          {fetchError}
+        </div>
+      ) : null}
+
       {scopeLabel ? (
         <div className="mb-2 shrink-0 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-800 dark:text-amber-200">
           Showing personnel for: <span className="font-semibold">{scopeLabel}</span>

@@ -30,6 +30,8 @@ export async function GET(request: Request) {
     p_sort: 'rank-desc',
     p_limit: limit,
     p_offset: offset,
+    p_office: null,
+    p_station: null,
   });
 
   if (error) {

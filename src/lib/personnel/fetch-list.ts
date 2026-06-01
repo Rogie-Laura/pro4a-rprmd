@@ -20,29 +20,20 @@ export type PersonnelPageParams = {
 export type PersonnelPage = {
   records: PersonnelRecord[];
   total: number;
+  error?: string;
 };
 
-async function fetchPersonnelPageFromDb(params: PersonnelPageParams): Promise<PersonnelPage> {
-  // Data RPCs are server-only (revoked from anon); use the service-role client.
-  if (!hasAdminClient()) {
-    return { records: [], total: 0 };
-  }
+type RpcPayload = {
+  p_search: string;
+  p_view: string;
+  p_sort: string;
+  p_limit: number;
+  p_offset: number;
+  p_office?: string | null;
+  p_station?: string | null;
+};
 
-  const supabase = createAdminClient();
-  const { data, error } = await supabase.rpc('list_personnel_rprmd_paged', {
-    p_search: params.search,
-    p_view: params.view,
-    p_sort: params.sort,
-    p_limit: params.limit,
-    p_offset: params.offset,
-    p_office: params.scope?.office || null,
-    p_station: params.scope?.station || null,
-  });
-
-  if (error || !data) {
-    return { records: [], total: 0 };
-  }
-
+function parseRpcResult(data: unknown): PersonnelPage {
   const parsed = (typeof data === 'string' ? JSON.parse(data) : data) as {
     records?: PersonnelRecord[];
     total?: number;
@@ -54,13 +45,106 @@ async function fetchPersonnelPageFromDb(params: PersonnelPageParams): Promise<Pe
   };
 }
 
-// Arguments are part of the cache key, so each distinct page/search/sort is cached
-// independently for a short window and invalidated on import via the shared tag.
-export const getPersonnelPage = unstable_cache(
-  fetchPersonnelPageFromDb,
-  [PERSONNEL_LIST_CACHE_TAG, 'page'],
-  {
-    tags: [PERSONNEL_LIST_CACHE_TAG],
-    revalidate: 60,
+function resolveScopeFilters(scope: PersonnelScope | null): {
+  office: string | null;
+  station: string | null;
+  incomplete: boolean;
+} {
+  if (!scope) {
+    return { office: null, station: null, incomplete: false };
   }
-);
+
+  const office = scope.office.trim();
+  const station = scope.station.trim();
+
+  if (!office || !station) {
+    return { office: null, station: null, incomplete: true };
+  }
+
+  return { office, station, incomplete: false };
+}
+
+async function callPersonnelRpc(payload: RpcPayload) {
+  const supabase = createAdminClient();
+  return supabase.rpc('list_personnel_rprmd_paged', payload);
+}
+
+async function fetchPersonnelPageFromDb(params: PersonnelPageParams): Promise<PersonnelPage> {
+  if (!hasAdminClient()) {
+    return {
+      records: [],
+      total: 0,
+      error: 'SUPABASE_SERVICE_ROLE_KEY is not configured.',
+    };
+  }
+
+  const { office, station, incomplete } = resolveScopeFilters(params.scope);
+
+  if (incomplete) {
+    return {
+      records: [],
+      total: 0,
+      error: 'Your account is missing office or unit. Contact an administrator.',
+    };
+  }
+
+  const basePayload: RpcPayload = {
+    p_search: params.search,
+    p_view: params.view,
+    p_sort: params.sort,
+    p_limit: params.limit,
+    p_offset: params.offset,
+  };
+
+  const scopedPayload: RpcPayload = {
+    ...basePayload,
+    p_office: office,
+    p_station: station,
+  };
+
+  // Prefer the scoped RPC (sql/016). Fall back to the legacy 5-arg RPC if 016
+  // has not been applied yet so the list does not silently go empty.
+  let { data, error } = await callPersonnelRpc(scopedPayload);
+
+  if (error && office === null && station === null) {
+    ({ data, error } = await callPersonnelRpc(basePayload));
+  }
+
+  if (error) {
+    console.error('[personnel] RPC list_personnel_rprmd_paged failed:', error.message);
+    return {
+      records: [],
+      total: 0,
+      error: `Unable to load personnel list. Run sql/016_personnel_scope_filter.sql in Supabase if not yet applied. (${error.message})`,
+    };
+  }
+
+  if (!data) {
+    return { records: [], total: 0, error: 'No data returned from personnel query.' };
+  }
+
+  return parseRpcResult(data);
+}
+
+export async function getPersonnelPage(params: PersonnelPageParams): Promise<PersonnelPage> {
+  const scopeOffice = params.scope?.office?.trim() ?? '';
+  const scopeStation = params.scope?.station?.trim() ?? '';
+
+  return unstable_cache(
+    () => fetchPersonnelPageFromDb(params),
+    [
+      PERSONNEL_LIST_CACHE_TAG,
+      params.search,
+      params.view,
+      params.sort,
+      String(params.limit),
+      String(params.offset),
+      scopeOffice,
+      scopeStation,
+    ],
+    {
+      tags: [PERSONNEL_LIST_CACHE_TAG],
+      revalidate: 60,
+    }
+  )();
+}

@@ -49,11 +49,13 @@ export default async function DashboardPage({
   const data = await getPersonnelPage({ search, view, sort, limit, offset, scope });
 
   const scopeLabel =
-    scope && scope.office && scope.station
-      ? `${scope.office} — ${scope.station}`
-      : scope
-        ? 'Your account has no office/unit assigned — contact an administrator.'
-        : null;
+    data.error
+      ? null
+      : scope && scope.office && scope.station
+        ? `${scope.office} — ${scope.station}`
+        : scope
+          ? 'Your account has no office/unit assigned — contact an administrator.'
+          : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -67,6 +69,7 @@ export default async function DashboardPage({
         page={page}
         canAddPersonnel={canAddPersonnel(session.user?.role)}
         scopeLabel={scopeLabel}
+        fetchError={data.error}
       />
     </div>
   );
