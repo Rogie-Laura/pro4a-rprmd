@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PRO4A RPRMD Entry App (Division R1)
 
-## Getting Started
+Next.js app for **RPRMD** personnel data entry. Data in **Supabase**.
 
-First, run the development server:
+## Login table: `users`
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+| Field | Notes |
+|-------|-------|
+| id | Auto UUID |
+| rank | e.g. PSSg |
+| full_name | Required |
+| rank_fullname | Auto: rank + full_name |
+| badge_number | Unique — used for login |
+| office | e.g. PRO4A |
+| unit | e.g. RICTMD |
+| password | Bcrypt hashed |
+| role | super_admin, RPRMD_admin, rhq_admin, phq_admin, stn_admin |
+| session | Active session token |
+
+Login: **badge number + password**
+
+## Roles
+
+| Role | Access |
+|------|--------|
+| **super_admin** | Full user management, all roles |
+| **RPRMD_admin** | Manage stn_admin users, personnel data |
+| **rhq_admin / phq_admin / stn_admin** | App access, personnel data |
+
+## Setup
+
+1. Run SQL in Supabase (in order):
+   - `sql/003_users_table.sql` — creates `users` table + your account
+   - `sql/004_login_rpc.sql` — connects login to `users` table
+
+2. `.env.local`:
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+3. `npm run dev` → http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Bootstrap user (included in 003_users_table.sql)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Field | Value |
+|-------|-------|
+| Rank | PSSg |
+| Full Name | Rogie J Laura |
+| Badge | 226609 |
+| Office | PRO4A |
+| Unit | RICTMD |
+| Password | 111111 |
+| Role | super_admin |
 
-## Learn More
+After running SQL, login with badge **226609** / password **111111**.
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Add more users via Dashboard → **Manage Users**.
