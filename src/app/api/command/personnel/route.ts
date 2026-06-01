@@ -32,6 +32,7 @@ export async function GET(request: Request) {
     p_offset: offset,
     p_office: null,
     p_station: null,
+    p_include_sub_units: false,
   });
 
   if (error) {

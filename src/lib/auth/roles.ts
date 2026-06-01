@@ -58,6 +58,8 @@ export function isScopedPersonnelRole(role: string | null | undefined): boolean 
 export type PersonnelScope = {
   office: string;
   station: string;
+  /** RHQ/PHQ admins also see hyphenated sub-units (e.g. ORPRMD → ORPRMD-RPHAS). */
+  includeSubUnits: boolean;
 };
 
 /**
@@ -76,7 +78,19 @@ export function getPersonnelScopeForUser(user: {
   const office = user.office?.trim() ?? '';
   const station = user.unit?.trim() ?? '';
 
-  return { office, station };
+  return {
+    office,
+    station,
+    includeSubUnits: user.role === 'rhq_admin' || user.role === 'phq_admin',
+  };
+}
+
+export function formatPersonnelScopeLabel(scope: PersonnelScope): string {
+  const base = `${scope.office} — ${scope.station}`;
+  if (scope.includeSubUnits) {
+    return `${base} (incl. ${scope.station}-*)`;
+  }
+  return base;
 }
 
 export function canManageTargetRole(

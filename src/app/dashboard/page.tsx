@@ -1,5 +1,9 @@
 import { PersonnelTable } from '@/components/dashboard/personnel-table';
-import { canAddPersonnel, getPersonnelScopeForUser } from '@/lib/auth/roles';
+import {
+  canAddPersonnel,
+  formatPersonnelScopeLabel,
+  getPersonnelScopeForUser,
+} from '@/lib/auth/roles';
 import { getSessionUser } from '@/lib/auth/session';
 import {
   getPersonnelPage,
@@ -52,7 +56,7 @@ export default async function DashboardPage({
     data.error
       ? null
       : scope && scope.office && scope.station
-        ? `${scope.office} — ${scope.station}`
+        ? formatPersonnelScopeLabel(scope)
         : scope
           ? 'Your account has no office/unit assigned — contact an administrator.'
           : null;

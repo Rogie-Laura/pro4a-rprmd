@@ -31,6 +31,7 @@ type RpcPayload = {
   p_offset: number;
   p_office?: string | null;
   p_station?: string | null;
+  p_include_sub_units?: boolean;
 };
 
 function parseRpcResult(data: unknown): PersonnelPage {
@@ -48,20 +49,26 @@ function parseRpcResult(data: unknown): PersonnelPage {
 function resolveScopeFilters(scope: PersonnelScope | null): {
   office: string | null;
   station: string | null;
+  includeSubUnits: boolean;
   incomplete: boolean;
 } {
   if (!scope) {
-    return { office: null, station: null, incomplete: false };
+    return { office: null, station: null, includeSubUnits: false, incomplete: false };
   }
 
   const office = scope.office.trim();
   const station = scope.station.trim();
 
   if (!office || !station) {
-    return { office: null, station: null, incomplete: true };
+    return { office: null, station: null, includeSubUnits: false, incomplete: true };
   }
 
-  return { office, station, incomplete: false };
+  return {
+    office,
+    station,
+    includeSubUnits: scope.includeSubUnits,
+    incomplete: false,
+  };
 }
 
 async function callPersonnelRpc(payload: RpcPayload) {
@@ -78,7 +85,7 @@ async function fetchPersonnelPageFromDb(params: PersonnelPageParams): Promise<Pe
     };
   }
 
-  const { office, station, incomplete } = resolveScopeFilters(params.scope);
+  const { office, station, includeSubUnits, incomplete } = resolveScopeFilters(params.scope);
 
   if (incomplete) {
     return {
@@ -100,6 +107,7 @@ async function fetchPersonnelPageFromDb(params: PersonnelPageParams): Promise<Pe
     ...basePayload,
     p_office: office,
     p_station: station,
+    p_include_sub_units: includeSubUnits,
   };
 
   // Prefer the scoped RPC (sql/016). Fall back to the legacy 5-arg RPC if 016
@@ -115,7 +123,7 @@ async function fetchPersonnelPageFromDb(params: PersonnelPageParams): Promise<Pe
     return {
       records: [],
       total: 0,
-      error: `Unable to load personnel list. Run sql/016_personnel_scope_filter.sql in Supabase if not yet applied. (${error.message})`,
+      error: `Unable to load personnel list. Run sql/018_personnel_sub_unit_scope.sql in Supabase if not yet applied. (${error.message})`,
     };
   }
 
@@ -141,6 +149,7 @@ export async function getPersonnelPage(params: PersonnelPageParams): Promise<Per
       String(params.offset),
       scopeOffice,
       scopeStation,
+      String(params.scope?.includeSubUnits ?? false),
     ],
     {
       tags: [PERSONNEL_LIST_CACHE_TAG],
