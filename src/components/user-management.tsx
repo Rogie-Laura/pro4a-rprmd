@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition, type ReactNode } from 'react';
+import { useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   createManagedUser,
@@ -9,6 +9,8 @@ import {
   type ManagedUser,
   type UserActionResult,
 } from '@/app/actions/users';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Modal } from '@/components/ui/modal';
 import { ROLE_LABELS, canManageTargetRole, type AppRole } from '@/lib/auth/roles';
 
 type UserManagementProps = {
@@ -35,6 +37,10 @@ const tableTruncateClass = 'truncate';
 const inputClass =
   'w-full rounded-md border border-[var(--app-border)] bg-[var(--app-surface-2)] px-2.5 py-1.5 text-xs text-[var(--app-text)] outline-none focus:border-amber-500/50';
 const labelClass = 'mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--app-text-muted)]';
+const btnSecondary =
+  'inline-flex h-8 items-center rounded-md border border-[var(--app-border)] bg-[var(--app-surface-2)] px-4 text-xs font-medium text-[var(--app-text)] transition hover:bg-[var(--app-hover)] disabled:opacity-50';
+const btnPrimary =
+  'inline-flex h-8 items-center rounded-md bg-amber-500 px-4 text-xs font-semibold text-slate-950 transition hover:bg-amber-400 disabled:opacity-50';
 
 function cell(value: string | null | undefined) {
   return value && value.trim() !== '' ? value : '—';
@@ -71,38 +77,17 @@ function StatusBadge({ active }: { active: boolean }) {
   );
 }
 
-function Modal({
-  title,
-  onClose,
-  children,
-}: {
-  title: string;
-  onClose: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-[var(--app-border)] bg-[var(--app-popover)] p-5 shadow-xl">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold text-[var(--app-text)]">{title}</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md px-2 py-1 text-xs text-[var(--app-text-muted)] transition hover:bg-[var(--app-hover)] hover:text-[var(--app-text)]"
-          >
-            Close
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
 export function UserManagement({ users, assignableRoles, actorRole, currentUserId }: UserManagementProps) {
   const router = useRouter();
+  const createFormRef = useRef<HTMLFormElement>(null);
   const [search, setSearch] = useState('');
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showCreateConfirm, setShowCreateConfirm] = useState(false);
+  const [createConfirmSummary, setCreateConfirmSummary] = useState<{
+    name: string;
+    badge: string;
+    role: string;
+  } | null>(null);
   const [editUser, setEditUser] = useState<ManagedUser | null>(null);
   const [resetUser, setResetUser] = useState<ManagedUser | null>(null);
   const [createResult, setCreateResult] = useState<UserActionResult | null>(null);
@@ -138,14 +123,47 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
     router.refresh();
   }
 
-  function handleCreate(formData: FormData) {
+  function closeAddModal() {
+    setShowAddModal(false);
+    setShowCreateConfirm(false);
+    setCreateConfirmSummary(null);
+    setCreateResult(null);
+    createFormRef.current?.reset();
+  }
+
+  function requestCreateConfirm() {
+    const form = createFormRef.current;
+    if (!form?.checkValidity()) {
+      form?.reportValidity();
+      return;
+    }
+
+    const formData = new FormData(form);
+    const roleValue = String(formData.get('role') ?? '');
+    setCreateConfirmSummary({
+      name: String(formData.get('full_name') ?? ''),
+      badge: String(formData.get('badge_number') ?? ''),
+      role: ROLE_LABELS[roleValue as AppRole] ?? roleValue,
+    });
+    setShowCreateConfirm(true);
+  }
+
+  function submitCreateUser() {
+    const form = createFormRef.current;
+    if (!form) {
+      return;
+    }
+
+    const formData = new FormData(form);
     startCreate(async () => {
       const result = await createManagedUser(formData);
       setCreateResult(result);
       if (result.ok) {
-        setShowAddForm(false);
-        (document.getElementById('create-user-form') as HTMLFormElement | null)?.reset();
+        setShowCreateConfirm(false);
+        closeAddModal();
         refreshList();
+      } else {
+        setShowCreateConfirm(false);
       }
     });
   }
@@ -181,6 +199,8 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
     });
   }
 
+  const createPreview = showCreateConfirm ? createConfirmSummary : null;
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="mb-3 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2">
@@ -202,66 +222,14 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
         <button
           type="button"
           onClick={() => {
-            setShowAddForm((value) => !value);
             setCreateResult(null);
+            setShowAddModal(true);
           }}
           className="ml-auto inline-flex h-8 shrink-0 items-center rounded-md bg-amber-500 px-3 text-xs font-semibold text-slate-950 transition hover:bg-amber-400"
         >
-          {showAddForm ? 'Cancel' : 'Add User'}
+          Add User
         </button>
       </div>
-
-      {showAddForm ? (
-        <div className="mb-3 shrink-0 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
-          <h3 className="mb-3 text-sm font-semibold text-[var(--app-text)]">New User Account</h3>
-          <form id="create-user-form" action={handleCreate} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <label htmlFor="rank" className={labelClass}>Rank</label>
-              <input id="rank" name="rank" className={inputClass} placeholder="PSSg" />
-            </div>
-            <div>
-              <label htmlFor="full_name" className={labelClass}>Full Name</label>
-              <input id="full_name" name="full_name" required className={inputClass} placeholder="Juan Dela Cruz" />
-            </div>
-            <div>
-              <label htmlFor="badge_number" className={labelClass}>Badge Number</label>
-              <input id="badge_number" name="badge_number" required className={inputClass} placeholder="226609" />
-            </div>
-            <div>
-              <label htmlFor="office" className={labelClass}>Office</label>
-              <input id="office" name="office" className={inputClass} placeholder="PRO4A" />
-            </div>
-            <div>
-              <label htmlFor="unit" className={labelClass}>Unit</label>
-              <input id="unit" name="unit" className={inputClass} placeholder="RPRMD" />
-            </div>
-            <div>
-              <label htmlFor="password" className={labelClass}>Password</label>
-              <input id="password" name="password" type="password" required minLength={6} className={inputClass} placeholder="Min. 6 characters" />
-            </div>
-            <div>
-              <label htmlFor="role" className={labelClass}>Role</label>
-              <select id="role" name="role" required defaultValue={assignableRoles[assignableRoles.length - 1]} className={inputClass}>
-                {assignableRoles.map((role) => (
-                  <option key={role} value={role}>{ROLE_LABELS[role]}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-end sm:col-span-2 lg:col-span-3">
-              <button
-                type="submit"
-                disabled={isCreating}
-                className="inline-flex h-8 items-center rounded-md bg-amber-500 px-4 text-xs font-semibold text-slate-950 transition hover:bg-amber-400 disabled:opacity-50"
-              >
-                {isCreating ? 'Creating...' : 'Create User'}
-              </button>
-            </div>
-          </form>
-          <div className="mt-3">
-            <ActionMessage result={createResult} />
-          </div>
-        </div>
-      ) : null}
 
       {actionResult ? (
         <div className="mb-3 shrink-0">
@@ -365,6 +333,76 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
         </table>
       </div>
 
+      {showAddModal ? (
+        <Modal
+          title="Add New User"
+          onClose={closeAddModal}
+          maxWidth="lg"
+          footer={
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={closeAddModal} disabled={isCreating} className={btnSecondary}>
+                Cancel
+              </button>
+              <button type="button" onClick={requestCreateConfirm} disabled={isCreating} className={btnPrimary}>
+                Add User
+              </button>
+            </div>
+          }
+        >
+          <form ref={createFormRef} id="create-user-form" className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="rank" className={labelClass}>Rank</label>
+              <input id="rank" name="rank" className={inputClass} placeholder="PSSg" />
+            </div>
+            <div>
+              <label htmlFor="full_name" className={labelClass}>Full Name</label>
+              <input id="full_name" name="full_name" required className={inputClass} placeholder="Juan Dela Cruz" />
+            </div>
+            <div>
+              <label htmlFor="badge_number" className={labelClass}>Badge Number</label>
+              <input id="badge_number" name="badge_number" required className={inputClass} placeholder="226609" />
+            </div>
+            <div>
+              <label htmlFor="office" className={labelClass}>Office</label>
+              <input id="office" name="office" className={inputClass} placeholder="PRO4A" />
+            </div>
+            <div>
+              <label htmlFor="unit" className={labelClass}>Unit</label>
+              <input id="unit" name="unit" className={inputClass} placeholder="RPRMD" />
+            </div>
+            <div>
+              <label htmlFor="password" className={labelClass}>Password</label>
+              <input id="password" name="password" type="password" required minLength={6} className={inputClass} placeholder="Min. 6 characters" />
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="role" className={labelClass}>Role</label>
+              <select id="role" name="role" required defaultValue={assignableRoles[assignableRoles.length - 1]} className={inputClass}>
+                {assignableRoles.map((role) => (
+                  <option key={role} value={role}>{ROLE_LABELS[role]}</option>
+                ))}
+              </select>
+            </div>
+          </form>
+          {createResult && !createResult.ok ? (
+            <div className="mt-3">
+              <ActionMessage result={createResult} />
+            </div>
+          ) : null}
+        </Modal>
+      ) : null}
+
+      {showCreateConfirm ? (
+        <ConfirmDialog
+          title="Create User Account?"
+          message={`Are you sure you want to create an account for ${createPreview?.name || 'this user'} (Badge ${createPreview?.badge || '—'}) with role ${createPreview?.role || '—'}?`}
+          confirmLabel="Yes, Add User"
+          cancelLabel="Cancel"
+          onConfirm={submitCreateUser}
+          onCancel={() => setShowCreateConfirm(false)}
+          isPending={isCreating}
+        />
+      ) : null}
+
       {editUser ? (
         <Modal title="Edit User" onClose={() => setEditUser(null)}>
           <form action={handleUpdate} className="space-y-3">
@@ -419,11 +457,7 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
                 </select>
               </div>
             </div>
-            <button
-              type="submit"
-              disabled={isUpdating}
-              className="inline-flex h-8 items-center rounded-md bg-amber-500 px-4 text-xs font-semibold text-slate-950 transition hover:bg-amber-400 disabled:opacity-50"
-            >
+            <button type="submit" disabled={isUpdating} className={btnPrimary}>
               {isUpdating ? 'Saving...' : 'Save Changes'}
             </button>
           </form>
@@ -445,11 +479,7 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
                 placeholder="Minimum 6 characters"
               />
             </div>
-            <button
-              type="submit"
-              disabled={isUpdating}
-              className="inline-flex h-8 items-center rounded-md bg-amber-500 px-4 text-xs font-semibold text-slate-950 transition hover:bg-amber-400 disabled:opacity-50"
-            >
+            <button type="submit" disabled={isUpdating} className={btnPrimary}>
               {isUpdating ? 'Updating...' : 'Update Password'}
             </button>
           </form>

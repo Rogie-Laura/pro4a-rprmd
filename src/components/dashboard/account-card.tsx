@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { logoutUser } from '@/app/actions/auth';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useTheme, type Theme } from '@/components/theme-provider';
 
 type AccountCardProps = {
@@ -73,8 +74,16 @@ export function AccountCard({
   unit,
 }: AccountCardProps) {
   const [open, setOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isLoggingOut, startLogout] = useTransition();
   const cardRef = useRef<HTMLDivElement>(null);
   const { theme, setTheme } = useTheme();
+
+  function handleLogoutConfirm() {
+    startLogout(async () => {
+      await logoutUser();
+    });
+  }
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -134,15 +143,30 @@ export function AccountCard({
             />
           </div>
 
-          <form action={logoutUser}>
-            <button
-              type="submit"
-              className="w-full px-3 py-2 text-left text-xs text-red-500 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40"
-            >
-              Logout
-            </button>
-          </form>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setShowLogoutConfirm(true);
+            }}
+            className="w-full px-3 py-2 text-left text-xs text-red-500 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40"
+          >
+            Logout
+          </button>
         </div>
+      ) : null}
+
+      {showLogoutConfirm ? (
+        <ConfirmDialog
+          title="Sign Out?"
+          message="Are you sure you want to log out of your account?"
+          confirmLabel="Yes, Logout"
+          cancelLabel="Cancel"
+          variant="danger"
+          onConfirm={handleLogoutConfirm}
+          onCancel={() => setShowLogoutConfirm(false)}
+          isPending={isLoggingOut}
+        />
       ) : null}
     </div>
   );
