@@ -71,11 +71,11 @@ export async function loginWithBadge(formData: FormData): Promise<LoginResult> {
       path: '/',
       maxAge: 60 * 60 * 24 * 7,
     });
-
-    return { ok: true, message: 'Signed in successfully.' };
   } catch {
     return { ok: false, message: 'Login service unavailable. Check Supabase connection.' };
   }
+
+  redirect('/dashboard');
 }
 
 export async function logoutUser() {

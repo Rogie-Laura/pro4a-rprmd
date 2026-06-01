@@ -1,6 +1,7 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
+import { PERSONNEL_LIST_CACHE_TAG } from '@/lib/personnel/fetch-list';
 import { DATA_TABLE } from '@/lib/auth/roles';
 import { getSessionUser } from '@/lib/auth/session';
 import { parsePersonnelExcel } from '@/lib/personnel/parse-excel';
@@ -87,6 +88,7 @@ export async function uploadPersonnelList(formData: FormData): Promise<Personnel
       imported += batch.length;
     }
 
+    revalidateTag(PERSONNEL_LIST_CACHE_TAG, 'max');
     revalidatePath('/dashboard');
     revalidatePath('/dashboard/settings');
 

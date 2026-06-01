@@ -1,25 +1,30 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { compareByRank } from '@/lib/personnel/rank-order';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useRef, useState, useTransition, type ReactNode } from 'react';
+import type { PersonnelSort, PersonnelView } from '@/lib/personnel/fetch-list';
 import type { PersonnelRecord } from '@/lib/personnel/types';
+
+type LimitOption = 250 | 500 | 1000 | 2000;
 
 type PersonnelTableProps = {
   records: PersonnelRecord[];
+  total: number;
+  search: string;
+  view: PersonnelView;
+  sort: PersonnelSort;
+  limit: number;
+  page: number;
   canAddPersonnel?: boolean;
 };
 
-type SortOption = 'rank-asc' | 'rank-desc';
-type ViewOption = 'all' | 'on-duty' | 'schooling' | 'on-leave';
-type LimitOption = 250 | 500 | 1000 | 2000;
-
-const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+const SORT_OPTIONS: { value: PersonnelSort; label: string }[] = [
   { value: 'rank-asc', label: 'Lowest Rank → Highest Rank' },
   { value: 'rank-desc', label: 'Highest Rank → Lowest Rank' },
 ];
 
-const VIEW_OPTIONS: { value: ViewOption; label: string }[] = [
+const VIEW_OPTIONS: { value: PersonnelView; label: string }[] = [
   { value: 'all', label: 'View All' },
   { value: 'on-duty', label: 'On Duty' },
   { value: 'schooling', label: 'Schooling' },
@@ -76,58 +81,6 @@ function getStatusBadgeClass(status: string | null | undefined): string {
   return `${base} bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300`;
 }
 
-function matchesSearch(record: PersonnelRecord, query: string): boolean {
-  if (!query) {
-    return true;
-  }
-
-  const haystack = [
-    record.badge_number,
-    record.rank,
-    record.rank_name,
-    record.fname,
-    record.mname,
-    record.lname,
-    record.qual,
-    record.designation,
-    record.office,
-    record.station,
-    record.remarks,
-    record.email,
-    record.phone_number,
-    `${record.fname} ${record.mname ?? ''} ${record.lname}`.replace(/\s+/g, ' ').trim(),
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-
-  return haystack.includes(query.toLowerCase());
-}
-
-function matchesView(record: PersonnelRecord, view: ViewOption): boolean {
-  if (view === 'all') {
-    return true;
-  }
-
-  const status = (record.status ?? '').toLowerCase();
-  const disposition = (record.disposition ?? '').toLowerCase();
-  const combined = `${status} ${disposition}`;
-
-  if (view === 'on-duty') {
-    return combined.includes('on duty') || status === 'active';
-  }
-
-  if (view === 'schooling') {
-    return combined.includes('schooling') || combined.includes('school');
-  }
-
-  if (view === 'on-leave') {
-    return combined.includes('on leave') || combined.includes('leave');
-  }
-
-  return true;
-}
-
 const labelClass = 'shrink-0 text-xs font-medium text-[var(--app-text-muted)]';
 const controlClass =
   'h-8 w-52 rounded-md border border-[var(--app-border)] bg-[var(--app-surface-2)] px-2.5 text-xs text-[var(--app-text)] outline-none focus:border-amber-500/50';
@@ -179,45 +132,82 @@ function PageNavButton({
   );
 }
 
-export function PersonnelTable({ records, canAddPersonnel = false }: PersonnelTableProps) {
-  const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<SortOption>('rank-desc');
-  const [view, setView] = useState<ViewOption>('all');
-  const [limit, setLimit] = useState<LimitOption>(250);
-  const [page, setPage] = useState(1);
+export function PersonnelTable({
+  records,
+  total,
+  search,
+  view,
+  sort,
+  limit,
+  page,
+  canAddPersonnel = false,
+}: PersonnelTableProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
 
+  const [searchValue, setSearchValue] = useState(search);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Keep the input in sync when the URL changes externally (e.g. back/forward).
   useEffect(() => {
-    setPage(1);
-  }, [search, sort, view, limit]);
+    setSearchValue(search);
+  }, [search]);
 
-  const allFilteredRecords = useMemo(() => {
-    const query = search.trim();
+  function pushParams(
+    updates: Record<string, string | null>,
+    options: { resetPage?: boolean } = {}
+  ) {
+    const { resetPage = true } = options;
+    const params = new URLSearchParams(searchParams.toString());
 
-    const filtered = records.filter(
-      (record) => matchesSearch(record, query) && matchesView(record, view)
-    );
-
-    const direction = sort === 'rank-asc' ? 'asc' : 'desc';
-    filtered.sort((a, b) => compareByRank(a, b, direction));
-
-    return filtered;
-  }, [records, search, sort, view]);
-
-  const totalPages = Math.max(1, Math.ceil(allFilteredRecords.length / limit));
-  const currentPage = Math.min(page, totalPages);
-
-  useEffect(() => {
-    if (page !== currentPage) {
-      setPage(currentPage);
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === null || value === '') {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
     }
-  }, [page, currentPage]);
 
-  const paginatedRecords = useMemo(() => {
-    const start = (currentPage - 1) * limit;
-    return allFilteredRecords.slice(start, start + limit);
-  }, [allFilteredRecords, currentPage, limit]);
+    if (resetPage) {
+      params.delete('page');
+    }
 
+    const queryString = params.toString();
+    startTransition(() => {
+      router.push(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
+    });
+  }
+
+  function handleSearchChange(value: string) {
+    setSearchValue(value);
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    debounceRef.current = setTimeout(() => {
+      pushParams({ q: value.trim() || null });
+    }, 350);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
+
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
   const rowOffset = (currentPage - 1) * limit;
+
+  function goToPage(next: number) {
+    const target = Math.min(Math.max(1, next), totalPages);
+    pushParams({ page: target === 1 ? null : String(target) }, { resetPage: false });
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -225,8 +215,8 @@ export function PersonnelTable({ records, canAddPersonnel = false }: PersonnelTa
         <ToolbarField label="Search:">
           <input
             type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            value={searchValue}
+            onChange={(event) => handleSearchChange(event.target.value)}
             placeholder="Badge or name..."
             className={controlClass}
           />
@@ -235,7 +225,7 @@ export function PersonnelTable({ records, canAddPersonnel = false }: PersonnelTa
         <ToolbarField label="Sort:">
           <select
             value={sort}
-            onChange={(event) => setSort(event.target.value as SortOption)}
+            onChange={(event) => pushParams({ sort: event.target.value })}
             className={controlClass}
             aria-label="Sort personnel"
           >
@@ -250,7 +240,7 @@ export function PersonnelTable({ records, canAddPersonnel = false }: PersonnelTa
         <ToolbarField label="View:">
           <select
             value={view}
-            onChange={(event) => setView(event.target.value as ViewOption)}
+            onChange={(event) => pushParams({ view: event.target.value })}
             className={viewControlClass}
             aria-label="View filter"
           >
@@ -265,7 +255,7 @@ export function PersonnelTable({ records, canAddPersonnel = false }: PersonnelTa
         <ToolbarField label="Limit:">
           <select
             value={limit}
-            onChange={(event) => setLimit(Number(event.target.value) as LimitOption)}
+            onChange={(event) => pushParams({ limit: event.target.value })}
             className={limitControlClass}
             aria-label="Rows per page"
           >
@@ -281,13 +271,13 @@ export function PersonnelTable({ records, canAddPersonnel = false }: PersonnelTa
           <PageNavButton
             symbol="<"
             ariaLabel="First page"
-            onClick={() => setPage(1)}
+            onClick={() => goToPage(1)}
             disabled={currentPage <= 1}
           />
           <PageNavButton
             symbol="<<"
             ariaLabel="Previous page"
-            onClick={() => setPage((value) => Math.max(1, value - 1))}
+            onClick={() => goToPage(currentPage - 1)}
             disabled={currentPage <= 1}
           />
           <span className="min-w-[5.5rem] px-1.5 text-center text-xs text-[var(--app-text-muted)]">
@@ -296,15 +286,19 @@ export function PersonnelTable({ records, canAddPersonnel = false }: PersonnelTa
           <PageNavButton
             symbol=">>"
             ariaLabel="Next page"
-            onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+            onClick={() => goToPage(currentPage + 1)}
             disabled={currentPage >= totalPages}
           />
           <PageNavButton
             symbol=">"
             ariaLabel="Last page"
-            onClick={() => setPage(totalPages)}
+            onClick={() => goToPage(totalPages)}
             disabled={currentPage >= totalPages}
           />
+
+          <span className="px-1.5 text-xs text-[var(--app-text-muted)]">
+            {total.toLocaleString()} total
+          </span>
 
           {canAddPersonnel ? (
             <Link
@@ -317,8 +311,12 @@ export function PersonnelTable({ records, canAddPersonnel = false }: PersonnelTa
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-2)]">
-        <table className="w-full table-fixed border-collapse text-left">
+      <div className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-2)]">
+        <table
+          className={`w-full table-fixed border-collapse text-left transition-opacity ${
+            isPending ? 'opacity-50' : ''
+          }`}
+        >
           <colgroup>
             {TABLE_COLUMNS.map((column) => (
               <col key={column.key} style={{ width: `${TABLE_COLUMN_WIDTHS[column.key]}%` }} />
@@ -334,7 +332,7 @@ export function PersonnelTable({ records, canAddPersonnel = false }: PersonnelTa
             </tr>
           </thead>
           <tbody>
-            {paginatedRecords.length === 0 ? (
+            {records.length === 0 ? (
               <tr>
                 <td
                   colSpan={TABLE_COLUMNS.length}
@@ -344,7 +342,7 @@ export function PersonnelTable({ records, canAddPersonnel = false }: PersonnelTa
                 </td>
               </tr>
             ) : (
-              paginatedRecords.map((record, index) => (
+              records.map((record, index) => (
                 <tr
                   key={record.id}
                   className="border-b border-[var(--app-border)]/80 transition hover:bg-[var(--app-hover)]"

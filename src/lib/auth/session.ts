@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { cache } from 'react';
 import { SESSION_COOKIE } from '@/lib/auth/constants';
 import { canAccessRprmd, canAccessSystemSettings, canAddPersonnel, canManageUsers, type AppRole } from '@/lib/auth/roles';
 import { createClient } from '@/lib/supabase/server';
@@ -28,7 +29,7 @@ type SessionRpcUser = {
   is_active: boolean;
 };
 
-async function fetchUserBySession(sessionToken: string): Promise<AppUser | null> {
+const fetchUserBySession = cache(async (sessionToken: string): Promise<AppUser | null> => {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc('get_user_by_session', {
     p_session: sessionToken,
@@ -39,12 +40,12 @@ async function fetchUserBySession(sessionToken: string): Promise<AppUser | null>
   }
 
   return data as SessionRpcUser;
-}
+});
 
-export async function getSessionUser(): Promise<{
+export const getSessionUser = cache(async (): Promise<{
   userId: string;
   user: AppUser | null;
-}> {
+}> => {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(SESSION_COOKIE)?.value;
 
@@ -62,7 +63,7 @@ export async function getSessionUser(): Promise<{
     userId: user.id,
     user,
   };
-}
+});
 
 export async function requireRprmdAccess() {
   const session = await getSessionUser();

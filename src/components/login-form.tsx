@@ -1,12 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { loginWithBadge } from '@/app/actions/auth';
 import { DIVISION } from '@/lib/auth/roles';
 
 export function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const accessError = searchParams.get('error') === 'access';
 
@@ -31,11 +30,7 @@ export function LoginForm() {
     if (!result.ok) {
       setError(result.message);
       setLoading(false);
-      return;
     }
-
-    router.push('/dashboard');
-    router.refresh();
   }
 
   return (
