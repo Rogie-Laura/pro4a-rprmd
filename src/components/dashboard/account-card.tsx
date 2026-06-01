@@ -1,15 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import { logoutUser } from '@/app/actions/auth';
 import { useTheme, type Theme } from '@/components/theme-provider';
-import type { AppRole } from '@/lib/auth/roles';
 
 type AccountCardProps = {
   fullName: string;
   rankFullname: string | null;
-  role: AppRole;
   badgeNumber: string;
   office: string | null;
   unit: string | null;
@@ -71,7 +68,6 @@ function ThemeOption({
 export function AccountCard({
   fullName,
   rankFullname,
-  role,
   badgeNumber,
   office,
   unit,
@@ -79,7 +75,6 @@ export function AccountCard({
   const [open, setOpen] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const { theme, setTheme } = useTheme();
-  const isSuperAdmin = role === 'super_admin';
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -111,7 +106,7 @@ export function AccountCard({
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-52 overflow-hidden rounded-lg border border-[var(--app-border)] bg-[var(--app-surface)] shadow-xl shadow-black/20">
+        <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-52 overflow-hidden rounded-lg border border-[var(--app-border)] bg-[var(--app-popover)] shadow-xl shadow-black/20">
           <div className="flex items-center gap-2.5 border-b border-[var(--app-border)] px-3 py-2.5">
             <AccountAvatar name={fullName} size="lg" />
             <div className="min-w-0 text-[10px] text-[var(--app-text-muted)]">
@@ -138,16 +133,6 @@ export function AccountCard({
               onSelect={setTheme}
             />
           </div>
-
-          {isSuperAdmin ? (
-            <Link
-              href="/dashboard/users"
-              onClick={() => setOpen(false)}
-              className="block px-3 py-2 text-xs text-[var(--app-text)] transition hover:bg-[var(--app-hover)]"
-            >
-              Manage Users
-            </Link>
-          ) : null}
 
           <form action={logoutUser}>
             <button

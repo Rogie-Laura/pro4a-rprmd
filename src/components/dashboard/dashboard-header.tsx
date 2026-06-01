@@ -45,7 +45,6 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
           <AccountCard
             fullName={user.full_name}
             rankFullname={user.rank_fullname}
-            role={user.role}
             badgeNumber={user.badge_number}
             office={user.office}
             unit={user.unit}
