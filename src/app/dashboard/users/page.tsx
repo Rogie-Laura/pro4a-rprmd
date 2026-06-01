@@ -10,10 +10,12 @@ export default async function UsersPage() {
   ]);
 
   return (
-    <div>
-      <div className="mb-6">
-        <h2 className="text-lg font-semibold text-white">User Management</h2>
-        <p className="text-sm text-slate-400">Manage login accounts in the users table.</p>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="mb-3 shrink-0">
+        <h2 className="text-lg font-semibold text-[var(--app-text)]">User Management</h2>
+        <p className="text-sm text-[var(--app-text-muted)]">
+          Manage login accounts — badge number + password.
+        </p>
       </div>
 
       <UserManagement
