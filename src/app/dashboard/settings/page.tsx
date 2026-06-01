@@ -14,7 +14,7 @@ export default async function SystemSettingsPage() {
         </p>
       </div>
 
-      <div className="max-w-3xl">
+      <div className="max-w-6xl">
         <PersonnelUpload hasServiceRole={hasAdminClient()} />
       </div>
     </div>
