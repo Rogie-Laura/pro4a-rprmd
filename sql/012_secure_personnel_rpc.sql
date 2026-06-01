@@ -26,13 +26,15 @@ end $$;
 
 create extension if not exists pg_trgm with schema extensions;
 
+-- Note: rank_name is itself a generated column (rank + fname + mname + lname + qual),
+-- and Postgres forbids referencing a generated column here. Its source columns are
+-- already included below, so search results are unaffected.
 alter table public.personnel_list
   add column if not exists search_text text
   generated always as (
     lower(
       coalesce(badge_number, '') || ' ' ||
       coalesce(rank, '') || ' ' ||
-      coalesce(rank_name, '') || ' ' ||
       coalesce(fname, '') || ' ' ||
       coalesce(mname, '') || ' ' ||
       coalesce(lname, '') || ' ' ||
