@@ -11,7 +11,14 @@ import {
 } from '@/app/actions/users';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Modal } from '@/components/ui/modal';
-import { ROLE_LABELS, canManageTargetRole, type AppRole } from '@/lib/auth/roles';
+import { ACCESS_PAGE_LABELS, type AccessPage } from '@/lib/auth/access-page';
+import {
+  MANAGED_ROLE_LABELS,
+  canManageTargetRole,
+  rolesForAccessPage,
+  type AppRole,
+  type ManagedRole,
+} from '@/lib/auth/roles';
 import {
   unitsForOffice,
   withCurrentOption,
@@ -20,22 +27,35 @@ import {
 
 type UserManagementProps = {
   users: ManagedUser[];
-  assignableRoles: AppRole[];
+  assignableAccessPages: AccessPage[];
   actorRole: AppRole;
   currentUserId: string;
   lookup: PersonnelLookupOptions;
 };
 
 const TABLE_COLUMN_WIDTHS = {
-  index: 4,
-  rank_name: 22,
-  badge_number: 9,
-  office: 16,
-  unit: 14,
-  role: 14,
-  status: 9,
-  actions: 12,
+  index: 3,
+  rank_name: 18,
+  badge_number: 8,
+  office: 13,
+  unit: 11,
+  access: 10,
+  role: 12,
+  status: 8,
+  actions: 11,
 } as const;
+
+function canEditUser(actorRole: AppRole, user: ManagedUser): boolean {
+  if (actorRole === 'RPRMD_admin' && user.access_page !== 'RPRMD') {
+    return false;
+  }
+
+  return canManageTargetRole(actorRole, user.role as AppRole);
+}
+
+function roleLabel(role: ManagedRole): string {
+  return MANAGED_ROLE_LABELS[role] ?? role;
+}
 
 const tableCellClass = 'px-2 py-1.5 text-[10px] leading-tight';
 const tableHeadClass = 'px-2 py-1.5 text-[9px] font-semibold leading-tight whitespace-nowrap';
@@ -170,7 +190,13 @@ function RankOfficeUnitFields({
   );
 }
 
-export function UserManagement({ users, assignableRoles, actorRole, currentUserId, lookup }: UserManagementProps) {
+export function UserManagement({
+  users,
+  assignableAccessPages,
+  actorRole,
+  currentUserId,
+  lookup,
+}: UserManagementProps) {
   const router = useRouter();
   const createFormRef = useRef<HTMLFormElement>(null);
   const [search, setSearch] = useState('');
@@ -180,6 +206,7 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
     name: string;
     badge: string;
     role: string;
+    accessPage: string;
   } | null>(null);
   const [editUser, setEditUser] = useState<ManagedUser | null>(null);
   const [resetUser, setResetUser] = useState<ManagedUser | null>(null);
@@ -191,9 +218,34 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
   const [addRank, setAddRank] = useState('');
   const [addOffice, setAddOffice] = useState('');
   const [addUnit, setAddUnit] = useState('');
+  const [addAccessPage, setAddAccessPage] = useState<AccessPage>(assignableAccessPages[0] ?? 'RPRMD');
+  const [addRole, setAddRole] = useState<ManagedRole>('stn_admin');
   const [editRank, setEditRank] = useState('');
   const [editOffice, setEditOffice] = useState('');
   const [editUnit, setEditUnit] = useState('');
+  const [editAccessPage, setEditAccessPage] = useState<AccessPage>('RPRMD');
+  const [editRole, setEditRole] = useState<ManagedRole>('stn_admin');
+
+  const addRoleOptions = useMemo(
+    () => rolesForAccessPage(addAccessPage),
+    [addAccessPage]
+  );
+  const editRoleOptions = useMemo(
+    () => rolesForAccessPage(editAccessPage),
+    [editAccessPage]
+  );
+
+  useEffect(() => {
+    if (!addRoleOptions.includes(addRole)) {
+      setAddRole(addRoleOptions[0] ?? 'stn_admin');
+    }
+  }, [addRole, addRoleOptions]);
+
+  useEffect(() => {
+    if (!editRoleOptions.includes(editRole)) {
+      setEditRole(editRoleOptions[0] ?? 'stn_admin');
+    }
+  }, [editRole, editRoleOptions]);
 
   useEffect(() => {
     if (!editUser) {
@@ -203,6 +255,8 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
     setEditRank(editUser.rank ?? '');
     setEditOffice(editUser.office ?? '');
     setEditUnit(editUser.unit ?? '');
+    setEditAccessPage(editUser.access_page);
+    setEditRole(editUser.role);
   }, [editUser]);
 
   function handleAddOfficeChange(value: string) {
@@ -229,7 +283,8 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
         user.rank,
         user.office,
         user.unit,
-        ROLE_LABELS[user.role],
+        ACCESS_PAGE_LABELS[user.access_page],
+        roleLabel(user.role),
       ]
         .filter(Boolean)
         .join(' ')
@@ -251,6 +306,8 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
     setAddRank('');
     setAddOffice('');
     setAddUnit('');
+    setAddAccessPage(assignableAccessPages[0] ?? 'RPRMD');
+    setAddRole(rolesForAccessPage(assignableAccessPages[0] ?? 'RPRMD')[0] ?? 'stn_admin');
     createFormRef.current?.reset();
   }
 
@@ -259,7 +316,19 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
     setAddRank('');
     setAddOffice('');
     setAddUnit('');
+    setAddAccessPage(assignableAccessPages[0] ?? 'RPRMD');
+    setAddRole(rolesForAccessPage(assignableAccessPages[0] ?? 'RPRMD')[0] ?? 'stn_admin');
     setShowAddModal(true);
+  }
+
+  function handleAddAccessPageChange(value: AccessPage) {
+    setAddAccessPage(value);
+    setAddRole(rolesForAccessPage(value)[0] ?? 'stn_admin');
+  }
+
+  function handleEditAccessPageChange(value: AccessPage) {
+    setEditAccessPage(value);
+    setEditRole(rolesForAccessPage(value)[0] ?? 'stn_admin');
   }
 
   function requestCreateConfirm() {
@@ -271,10 +340,12 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
 
     const formData = new FormData(form);
     const roleValue = String(formData.get('role') ?? '');
+    const accessPageValue = String(formData.get('access_page') ?? 'RPRMD');
     setCreateConfirmSummary({
       name: String(formData.get('full_name') ?? ''),
       badge: String(formData.get('badge_number') ?? ''),
-      role: ROLE_LABELS[roleValue as AppRole] ?? roleValue,
+      role: roleLabel(roleValue as ManagedRole),
+      accessPage: ACCESS_PAGE_LABELS[accessPageValue as AccessPage] ?? accessPageValue,
     });
     setShowCreateConfirm(true);
   }
@@ -379,6 +450,7 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
               <th className={tableHeadClass}>Badge #</th>
               <th className={tableHeadClass}>Office</th>
               <th className={tableHeadClass}>Unit</th>
+              <th className={tableHeadClass}>Access</th>
               <th className={tableHeadClass}>Role</th>
               <th className={tableHeadClass}>Status</th>
               <th className={tableHeadClass}>Actions</th>
@@ -387,13 +459,13 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
           <tbody>
             {filteredUsers.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-2 py-8 text-center text-[10px] text-[var(--app-text-muted)]">
+                <td colSpan={9} className="px-2 py-8 text-center text-[10px] text-[var(--app-text-muted)]">
                   No matching users found.
                 </td>
               </tr>
             ) : (
               filteredUsers.map((user, index) => {
-                const canEdit = canManageTargetRole(actorRole, user.role);
+                const canEdit = canEditUser(actorRole, user);
                 const isSelf = user.id === currentUserId;
 
                 return (
@@ -417,8 +489,11 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
                     <td className={`${tableCellClass} ${tableTruncateClass} text-[var(--app-text)]`} title={user.unit ?? undefined}>
                       {cell(user.unit)}
                     </td>
+                    <td className={`${tableCellClass} ${tableTruncateClass} text-[var(--app-text)]`} title={ACCESS_PAGE_LABELS[user.access_page]}>
+                      {ACCESS_PAGE_LABELS[user.access_page]}
+                    </td>
                     <td className={`${tableCellClass} ${tableTruncateClass} text-[var(--app-text)]`}>
-                      {ROLE_LABELS[user.role]}
+                      {roleLabel(user.role)}
                     </td>
                     <td className={tableCellClass}>
                       <StatusBadge active={user.is_active} />
@@ -501,10 +576,25 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
               <input id="password" name="password" type="password" required minLength={6} className={inputClass} placeholder="Min. 6 characters" />
             </div>
             <div>
+              <label htmlFor="access_page" className={labelClass}>Access Page</label>
+              <select
+                id="access_page"
+                name="access_page"
+                required
+                value={addAccessPage}
+                onChange={(event) => handleAddAccessPageChange(event.target.value as AccessPage)}
+                className={inputClass}
+              >
+                {assignableAccessPages.map((page) => (
+                  <option key={page} value={page}>{ACCESS_PAGE_LABELS[page]}</option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label htmlFor="role" className={labelClass}>Role</label>
-              <select id="role" name="role" required defaultValue={assignableRoles[assignableRoles.length - 1]} className={inputClass}>
-                {assignableRoles.map((role) => (
-                  <option key={role} value={role}>{ROLE_LABELS[role]}</option>
+              <select id="role" name="role" required value={addRole} onChange={(event) => setAddRole(event.target.value as ManagedRole)} className={inputClass}>
+                {addRoleOptions.map((role) => (
+                  <option key={role} value={role}>{roleLabel(role)}</option>
                 ))}
               </select>
             </div>
@@ -526,7 +616,7 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
       {showCreateConfirm ? (
         <ConfirmDialog
           title="Create User Account?"
-          message={`Are you sure you want to create an account for ${createPreview?.name || 'this user'} (Badge ${createPreview?.badge || '—'}) with role ${createPreview?.role || '—'}?`}
+          message={`Are you sure you want to create an account for ${createPreview?.name || 'this user'} (Badge ${createPreview?.badge || '—'}) with access ${createPreview?.accessPage || '—'} and role ${createPreview?.role || '—'}?`}
           confirmLabel="Yes, Add User"
           cancelLabel="Cancel"
           onConfirm={submitCreateUser}
@@ -560,16 +650,32 @@ export function UserManagement({ users, assignableRoles, actorRole, currentUserI
                 <input id="edit-full_name" name="full_name" defaultValue={editUser.full_name} required className={inputClass} />
               </div>
               <div>
+                <label htmlFor="edit-access_page" className={labelClass}>Access Page</label>
+                <select
+                  id="edit-access_page"
+                  name="access_page"
+                  value={editAccessPage}
+                  disabled={editUser.id === currentUserId}
+                  onChange={(event) => handleEditAccessPageChange(event.target.value as AccessPage)}
+                  className={inputClass}
+                >
+                  {assignableAccessPages.map((page) => (
+                    <option key={page} value={page}>{ACCESS_PAGE_LABELS[page]}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label htmlFor="edit-role" className={labelClass}>Role</label>
                 <select
                   id="edit-role"
                   name="role"
-                  defaultValue={editUser.role}
+                  value={editRole}
                   disabled={editUser.id === currentUserId}
+                  onChange={(event) => setEditRole(event.target.value as ManagedRole)}
                   className={inputClass}
                 >
-                  {(editUser.id === currentUserId ? [editUser.role] : assignableRoles).map((role) => (
-                    <option key={role} value={role}>{ROLE_LABELS[role]}</option>
+                  {(editUser.id === currentUserId ? [editUser.role] : editRoleOptions).map((role) => (
+                    <option key={role} value={role}>{roleLabel(role)}</option>
                   ))}
                 </select>
               </div>

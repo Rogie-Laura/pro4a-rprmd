@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { SESSION_COOKIE, USERS_TABLE } from '@/lib/auth/constants';
 import { normalizeBadgeNumber } from '@/lib/auth/badge';
+import { canSignInToRprmd } from '@/lib/auth/access-page';
 import { canAccessRprmd } from '@/lib/auth/roles';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient, hasAdminClient } from '@/lib/supabase/admin';
@@ -19,6 +20,7 @@ type LoginRpcResult = {
   session_token?: string;
   user_id?: string;
   role?: string;
+  access_page?: string;
 };
 
 export async function loginWithBadge(formData: FormData): Promise<LoginResult> {
@@ -59,7 +61,7 @@ export async function loginWithBadge(formData: FormData): Promise<LoginResult> {
       return { ok: false, message: result?.message ?? 'Invalid badge number or password.' };
     }
 
-    if (!canAccessRprmd(result.role)) {
+    if (!canSignInToRprmd(result.access_page) || !canAccessRprmd({ role: result.role, access_page: result.access_page })) {
       return { ok: false, message: 'Access denied. Your account is not allowed to sign in here.' };
     }
 

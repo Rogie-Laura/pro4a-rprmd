@@ -34,8 +34,64 @@ export function isAppRole(role: string | null | undefined): role is AppRole {
   return !!role && ROLES.includes(role as AppRole);
 }
 
-export function canAccessRprmd(role: string | null | undefined): boolean {
-  return isAppRole(role);
+/** RLRDD app roles (managed from RPRMD User Management when access_page = RLRDD) */
+export const RLRDD_ROLES = ['rlrdd_admin', 'rlrdd_officer', 'rlrdd_staff'] as const;
+
+export type RlrddRole = (typeof RLRDD_ROLES)[number];
+
+export const RLRDD_ROLE_LABELS: Record<RlrddRole, string> = {
+  rlrdd_admin: 'RLRDD Admin',
+  rlrdd_officer: 'Property Officer',
+  rlrdd_staff: 'Property Staff',
+};
+
+/** All roles that may appear in the shared users table */
+export const ALL_MANAGED_ROLES = [...ROLES, ...RLRDD_ROLES] as const;
+
+export type ManagedRole = (typeof ALL_MANAGED_ROLES)[number];
+
+export const MANAGED_ROLE_LABELS: Record<ManagedRole, string> = {
+  ...ROLE_LABELS,
+  ...RLRDD_ROLE_LABELS,
+};
+
+export function isRlrddRole(role: string | null | undefined): role is RlrddRole {
+  return !!role && RLRDD_ROLES.includes(role as RlrddRole);
+}
+
+export function isManagedRole(role: string | null | undefined): role is ManagedRole {
+  return isAppRole(role) || isRlrddRole(role);
+}
+
+export function rolesForAccessPage(accessPage: 'RPRMD' | 'RLRDD' | 'BOTH'): ManagedRole[] {
+  if (accessPage === 'BOTH') {
+    return ['super_admin'];
+  }
+
+  if (accessPage === 'RLRDD') {
+    return [...RLRDD_ROLES];
+  }
+
+  return [...ROLES];
+}
+
+export function isRoleValidForAccessPage(
+  role: string,
+  accessPage: 'RPRMD' | 'RLRDD' | 'BOTH'
+): boolean {
+  return rolesForAccessPage(accessPage).includes(role as ManagedRole);
+}
+
+export function canAccessRprmd(user: {
+  role: string | null | undefined;
+  access_page?: string | null;
+}): boolean {
+  const accessPage = user.access_page ?? 'RPRMD';
+  if (accessPage !== 'RPRMD' && accessPage !== 'BOTH') {
+    return false;
+  }
+
+  return isAppRole(user.role);
 }
 
 export function canManageUsers(role: string | null | undefined): boolean {

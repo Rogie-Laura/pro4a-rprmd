@@ -2,6 +2,8 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import { SESSION_COOKIE } from '@/lib/auth/constants';
+import type { AccessPage } from '@/lib/auth/access-page';
+import { canSignInToRprmd } from '@/lib/auth/access-page';
 import { canAccessRprmd, canAccessSystemSettings, canAddPersonnel, canManageUsers, type AppRole } from '@/lib/auth/roles';
 import { createClient } from '@/lib/supabase/server';
 
@@ -14,6 +16,7 @@ export type AppUser = {
   office: string | null;
   unit: string | null;
   role: AppRole;
+  access_page: AccessPage;
   is_active: boolean;
 };
 
@@ -60,7 +63,7 @@ export async function requireRprmdAccess() {
     redirect('/login');
   }
 
-  if (!canAccessRprmd(session.user.role)) {
+  if (!canAccessRprmd(session.user)) {
     redirect('/login?error=access');
   }
 

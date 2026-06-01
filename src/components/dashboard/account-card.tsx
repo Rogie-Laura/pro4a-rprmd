@@ -97,31 +97,34 @@ export function AccountCard({
   }, []);
 
   return (
-    <div ref={cardRef} className="relative w-full">
+    <div
+      ref={cardRef}
+      className="relative w-max min-w-[11rem] max-w-[min(100vw-6rem,22rem)]"
+    >
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center gap-2.5 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-2)] px-2.5 py-2 text-left transition hover:border-amber-500/40"
+        className="flex w-full items-start gap-2.5 rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-2)] px-2.5 py-2 text-left transition hover:border-amber-500/40"
       >
         <AccountAvatar name={fullName} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-semibold text-[var(--app-text)]">
+          <p className="break-words text-xs font-semibold leading-snug text-[var(--app-text)]">
             {rankFullname ?? fullName}
           </p>
-          <p className="mt-0.5 truncate text-[10px] text-[var(--app-text-muted)]">
+          <p className="mt-0.5 text-[10px] text-[var(--app-text-muted)]">
             Badge {badgeNumber}
           </p>
         </div>
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-[calc(100%+6px)] z-50 w-52 overflow-hidden rounded-lg border border-[var(--app-border)] bg-[var(--app-popover)] shadow-xl shadow-black/20">
-          <div className="flex items-center gap-2.5 border-b border-[var(--app-border)] px-3 py-2.5">
+        <div className="absolute right-0 top-[calc(100%+6px)] z-50 min-w-full w-max max-w-[min(100vw-2rem,22rem)] overflow-hidden rounded-lg border border-[var(--app-border)] bg-[var(--app-popover)] shadow-xl shadow-black/20">
+          <div className="flex items-start gap-2.5 border-b border-[var(--app-border)] px-3 py-2.5">
             <AccountAvatar name={fullName} size="lg" />
-            <div className="min-w-0 text-[10px] text-[var(--app-text-muted)]">
-              <p className="truncate font-medium text-[var(--app-text)]">{fullName}</p>
-              <p className="truncate">Badge {badgeNumber}</p>
-              <p className="truncate">{office ?? '—'} • {unit ?? '—'}</p>
+            <div className="min-w-0 text-[10px] leading-snug text-[var(--app-text-muted)]">
+              <p className="break-words font-medium text-[var(--app-text)]">{fullName}</p>
+              <p className="mt-0.5">Badge {badgeNumber}</p>
+              <p className="mt-0.5 break-words">{office ?? '—'} • {unit ?? '—'}</p>
             </div>
           </div>
 

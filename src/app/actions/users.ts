@@ -5,9 +5,16 @@ import { normalizeBadgeNumber } from '@/lib/auth/badge';
 import { USERS_TABLE } from '@/lib/auth/constants';
 import { hashPasswordForDb } from '@/lib/auth/password';
 import {
+  assignableAccessPages,
+  isAccessPage,
+  type AccessPage,
+} from '@/lib/auth/access-page';
+import {
   assignableRoles,
   canManageTargetRole,
+  isRoleValidForAccessPage,
   type AppRole,
+  type ManagedRole,
 } from '@/lib/auth/roles';
 import { getSessionUser } from '@/lib/auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -25,13 +32,25 @@ export type ManagedUser = {
   badge_number: string;
   office: string | null;
   unit: string | null;
-  role: AppRole;
+  role: ManagedRole;
+  access_page: AccessPage;
   is_active: boolean;
   created_at: string;
 };
 
 const USER_LIST_SELECT =
-  'id, rank, full_name, rank_fullname, badge_number, office, unit, role, is_active, created_at';
+  'id, rank, full_name, rank_fullname, badge_number, office, unit, role, access_page, is_active, created_at';
+
+function canManageUser(
+  actorRole: string,
+  target: { role: ManagedRole; access_page: AccessPage }
+): boolean {
+  if (actorRole === 'RPRMD_admin' && target.access_page !== 'RPRMD') {
+    return false;
+  }
+
+  return canManageTargetRole(actorRole, target.role as AppRole);
+}
 
 async function requireActor() {
   const session = await getSessionUser();
@@ -75,7 +94,9 @@ export async function createManagedUser(formData: FormData): Promise<UserActionR
   const office = String(formData.get('office') ?? '').trim();
   const unit = String(formData.get('unit') ?? '').trim();
   const password = String(formData.get('password') ?? '');
-  const role = String(formData.get('role') ?? '') as AppRole;
+  const role = String(formData.get('role') ?? '') as ManagedRole;
+  const accessPageRaw = String(formData.get('access_page') ?? 'RPRMD');
+  const accessPage: AccessPage = isAccessPage(accessPageRaw) ? accessPageRaw : 'RPRMD';
 
   if (!fullName || !badgeNumber || !password) {
     return { ok: false, message: 'Full name, badge number, and password are required.' };
@@ -85,7 +106,15 @@ export async function createManagedUser(formData: FormData): Promise<UserActionR
     return { ok: false, message: 'Password must be at least 6 characters.' };
   }
 
-  if (!canManageTargetRole(actorRole, role)) {
+  if (!assignableAccessPages(actorRole).includes(accessPage)) {
+    return { ok: false, message: 'You cannot assign this access page.' };
+  }
+
+  if (!isRoleValidForAccessPage(role, accessPage)) {
+    return { ok: false, message: 'Role does not match the selected access page.' };
+  }
+
+  if (!canManageTargetRole(actorRole, role as AppRole)) {
     return { ok: false, message: 'You cannot assign this role.' };
   }
 
@@ -104,6 +133,7 @@ export async function createManagedUser(formData: FormData): Promise<UserActionR
     unit: unit || null,
     password: passwordHash,
     role,
+    access_page: accessPage,
     is_active: true,
   });
 
@@ -124,7 +154,9 @@ export async function updateManagedUser(formData: FormData): Promise<UserActionR
   const fullName = String(formData.get('full_name') ?? '').trim();
   const office = String(formData.get('office') ?? '').trim();
   const unit = String(formData.get('unit') ?? '').trim();
-  const role = String(formData.get('role') ?? '') as AppRole;
+  const role = String(formData.get('role') ?? '') as ManagedRole;
+  const accessPageRaw = String(formData.get('access_page') ?? 'RPRMD');
+  const accessPage: AccessPage = isAccessPage(accessPageRaw) ? accessPageRaw : 'RPRMD';
   const isActive = formData.get('is_active') === 'true';
 
   if (!userId || !fullName) {
@@ -139,7 +171,15 @@ export async function updateManagedUser(formData: FormData): Promise<UserActionR
     return { ok: false, message: 'You cannot change your own role.' };
   }
 
-  if (!canManageTargetRole(actorRole, role)) {
+  if (!assignableAccessPages(actorRole).includes(accessPage)) {
+    return { ok: false, message: 'You cannot assign this access page.' };
+  }
+
+  if (!isRoleValidForAccessPage(role, accessPage)) {
+    return { ok: false, message: 'Role does not match the selected access page.' };
+  }
+
+  if (!canManageTargetRole(actorRole, role as AppRole)) {
     return { ok: false, message: 'You cannot assign this role.' };
   }
 
@@ -147,7 +187,7 @@ export async function updateManagedUser(formData: FormData): Promise<UserActionR
 
   const { data: target, error: targetError } = await admin
     .from(USERS_TABLE)
-    .select('id, role')
+    .select('id, role, access_page')
     .eq('id', userId)
     .maybeSingle();
 
@@ -155,7 +195,7 @@ export async function updateManagedUser(formData: FormData): Promise<UserActionR
     return { ok: false, message: 'User not found.' };
   }
 
-  if (!canManageTargetRole(actorRole, target.role as AppRole)) {
+  if (!canManageUser(actorRole, target as { role: ManagedRole; access_page: AccessPage })) {
     return { ok: false, message: 'You cannot modify this user.' };
   }
 
@@ -167,6 +207,7 @@ export async function updateManagedUser(formData: FormData): Promise<UserActionR
       office: office || null,
       unit: unit || null,
       role,
+      access_page: accessPage,
       is_active: isActive,
       updated_at: new Date().toISOString(),
     })
@@ -199,7 +240,7 @@ export async function resetManagedUserPassword(formData: FormData): Promise<User
 
   const { data: target, error: targetError } = await admin
     .from(USERS_TABLE)
-    .select('id, role')
+    .select('id, role, access_page')
     .eq('id', userId)
     .maybeSingle();
 
@@ -207,7 +248,7 @@ export async function resetManagedUserPassword(formData: FormData): Promise<User
     return { ok: false, message: 'User not found.' };
   }
 
-  if (!canManageTargetRole(actorRole, target.role as AppRole)) {
+  if (!canManageUser(actorRole, target as { role: ManagedRole; access_page: AccessPage })) {
     return { ok: false, message: 'You cannot reset password for this user.' };
   }
 
@@ -236,4 +277,9 @@ export async function resetManagedUserPassword(formData: FormData): Promise<User
 export async function getAssignableRolesForActor(): Promise<AppRole[]> {
   const session = await requireActor();
   return assignableRoles(session.user?.role);
+}
+
+export async function getAssignableAccessPagesForActor(): Promise<AccessPage[]> {
+  const session = await requireActor();
+  return assignableAccessPages(session.user!.role);
 }

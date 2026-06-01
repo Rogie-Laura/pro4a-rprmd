@@ -41,7 +41,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
           </div>
         </div>
 
-        <div className="w-48 shrink-0 sm:w-52">
+        <div className="shrink-0">
           <AccountCard
             fullName={user.full_name}
             rankFullname={user.rank_fullname}
