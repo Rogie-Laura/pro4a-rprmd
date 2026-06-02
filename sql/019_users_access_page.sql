@@ -15,7 +15,7 @@ where role = 'super_admin';
 
 update public.users
 set access_page = 'RLRDD'
-where role in ('rlrdd_admin', 'rlrdd_officer', 'rlrdd_staff')
+where role in ('RLRDD_admin', 'stn_logistics', 'phq_logistics', 'rhq_logistics')
   and access_page = 'RPRMD';
 
 create or replace function public.login_user(p_badge text, p_password text)

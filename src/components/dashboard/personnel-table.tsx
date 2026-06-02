@@ -152,12 +152,14 @@ export function PersonnelTable({
   const [isPending, startTransition] = useTransition();
 
   const [searchValue, setSearchValue] = useState(search);
+  const [prevSearch, setPrevSearch] = useState(search);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep the input in sync when the URL changes externally (e.g. back/forward).
-  useEffect(() => {
+  if (search !== prevSearch) {
+    setPrevSearch(search);
     setSearchValue(search);
-  }, [search]);
+  }
 
   function pushParams(
     updates: Record<string, string | null>,

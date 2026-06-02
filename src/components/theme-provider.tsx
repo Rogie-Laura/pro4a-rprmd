@@ -17,14 +17,17 @@ const ThemeContext = createContext<ThemeContextValue>({
 const STORAGE_KEY = 'pro4a-theme';
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('dark');
+  const [theme, setThemeState] = useState<Theme>(() => {
+    if (typeof window === 'undefined') {
+      return 'dark';
+    }
+    const saved = window.localStorage.getItem(STORAGE_KEY) as Theme | null;
+    return saved === 'light' ? 'light' : 'dark';
+  });
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY) as Theme | null;
-    const initial = saved === 'light' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', initial);
-    setThemeState(initial);
-  }, []);
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   function setTheme(next: Theme) {
     document.documentElement.setAttribute('data-theme', next);

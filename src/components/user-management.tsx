@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   createManagedUser,
@@ -209,6 +209,7 @@ export function UserManagement({
     accessPage: string;
   } | null>(null);
   const [editUser, setEditUser] = useState<ManagedUser | null>(null);
+  const [prevEditUser, setPrevEditUser] = useState<ManagedUser | null>(null);
   const [resetUser, setResetUser] = useState<ManagedUser | null>(null);
   const [createResult, setCreateResult] = useState<UserActionResult | null>(null);
   const [actionResult, setActionResult] = useState<UserActionResult | null>(null);
@@ -235,29 +236,23 @@ export function UserManagement({
     [editAccessPage]
   );
 
-  useEffect(() => {
-    if (!addRoleOptions.includes(addRole)) {
-      setAddRole(addRoleOptions[0] ?? 'stn_admin');
-    }
-  }, [addRole, addRoleOptions]);
-
-  useEffect(() => {
-    if (!editRoleOptions.includes(editRole)) {
-      setEditRole(editRoleOptions[0] ?? 'stn_admin');
-    }
-  }, [editRole, editRoleOptions]);
-
-  useEffect(() => {
-    if (!editUser) {
-      return;
-    }
-
+  // Populate the edit form when a different user is selected (sync during render).
+  if (editUser && editUser !== prevEditUser) {
+    setPrevEditUser(editUser);
     setEditRank(editUser.rank ?? '');
     setEditOffice(editUser.office ?? '');
     setEditUnit(editUser.unit ?? '');
     setEditAccessPage(editUser.access_page);
     setEditRole(editUser.role);
-  }, [editUser]);
+  }
+
+  // Keep the selected role valid for the chosen access page.
+  if (!addRoleOptions.includes(addRole)) {
+    setAddRole(addRoleOptions[0] ?? 'stn_admin');
+  }
+  if (!editRoleOptions.includes(editRole)) {
+    setEditRole(editRoleOptions[0] ?? 'stn_admin');
+  }
 
   function handleAddOfficeChange(value: string) {
     setAddOffice(value);

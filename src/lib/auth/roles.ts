@@ -35,14 +35,20 @@ export function isAppRole(role: string | null | undefined): role is AppRole {
 }
 
 /** RLRDD app roles (managed from RPRMD User Management when access_page = RLRDD) */
-export const RLRDD_ROLES = ['rlrdd_admin', 'rlrdd_officer', 'rlrdd_staff'] as const;
+export const RLRDD_ROLES = [
+  'RLRDD_admin',
+  'stn_logistics',
+  'phq_logistics',
+  'rhq_logistics',
+] as const;
 
 export type RlrddRole = (typeof RLRDD_ROLES)[number];
 
 export const RLRDD_ROLE_LABELS: Record<RlrddRole, string> = {
-  rlrdd_admin: 'RLRDD Admin',
-  rlrdd_officer: 'Property Officer',
-  rlrdd_staff: 'Property Staff',
+  RLRDD_admin: 'RLRDD Admin',
+  stn_logistics: 'Station Logistics',
+  phq_logistics: 'PHQ Logistics',
+  rhq_logistics: 'RHQ Logistics',
 };
 
 /** All roles that may appear in the shared users table */
