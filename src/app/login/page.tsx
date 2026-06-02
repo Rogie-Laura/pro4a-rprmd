@@ -35,9 +35,21 @@ export default function LoginPage() {
           <LoginForm />
         </Suspense>
 
-        <p className="mt-6 text-center text-[11px] uppercase tracking-widest text-slate-500">
-          Developed by RICTMD4A
-        </p>
+        <div className="mt-8 border-t border-slate-700/60 pt-6 text-center">
+          <p className="text-sm font-bold tracking-[0.25em] text-amber-400">PROJECT4A</p>
+          <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+            <span className="font-medium text-amber-300/90">A</span>ccurate{' '}
+            <span className="text-slate-600">·</span>{' '}
+            <span className="font-medium text-amber-300/90">A</span>ccessible{' '}
+            <span className="text-slate-600">·</span>{' '}
+            <span className="font-medium text-amber-300/90">A</span>ctive{' '}
+            <span className="text-slate-600">·</span>{' '}
+            <span className="font-medium text-amber-300/90">A</span>utomated
+          </p>
+          <p className="mt-4 text-[10px] uppercase tracking-widest text-slate-500">
+            Developed by RICTMD4A
+          </p>
+        </div>
       </div>
     </div>
   );
